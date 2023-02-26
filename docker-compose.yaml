@@ -1,0 +1,47 @@
+version: "3.9"
+services:
+  db:
+    image: postgres
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: mydb
+    volumes:
+      - ./data:/var/lib/postgresql/data
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgres://myuser:mypassword@db:5432/mydb
+  healthcheck:
+    image: dockercloud/haproxy
+    environment:
+      - MODE=http
+      - HEALTHCHECK_PORT=8000
+      - STATS_PORT=1936
+      - TIMEOUT=10s
+      - INTERVAL=10s
+      - RETRIES=3
+      - OPTION httpchk GET /healthcheck
+    ports:
+      - 8080:80
+      - 1936:1936
+    depends_on:
+      - app
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    depends_on:
+      - prometheus
